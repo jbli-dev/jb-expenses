@@ -17,6 +17,16 @@ export interface CategoryOption {
   total?: number;
 }
 
+/** A recurring expense normalized to its equivalent monthly charge. */
+export interface RecurringCharge {
+  id: string;
+  title: string;
+  category: string | null;
+  amount: number;
+  frequency: Frequency;
+  monthlyCharge: number;
+}
+
 export interface ReportOccurrence {
   id: string;
   title: string;
@@ -45,6 +55,8 @@ export interface Report {
   count: number;
   average: number;
   averageLabel: string;
+  /** Total spend from recurring expenses within the period. */
+  recurring: number;
   topCategory: string | null;
   buckets: Bucket[];
   occurrences: ReportOccurrence[];
@@ -171,11 +183,16 @@ export async function buildReport(
   const buckets = buildBuckets(period, start, end);
 
   let total = 0;
+  let recurring = 0;
   const categoryTotals = new Map<string, number>();
   const today = startOfDay(new Date());
 
   for (const occurrence of occurrences) {
     total += occurrence.amount;
+
+    if (occurrence.frequency) {
+      recurring += occurrence.amount;
+    }
 
     const category = occurrence.category ?? "Other";
     categoryTotals.set(category, (categoryTotals.get(category) ?? 0) + occurrence.amount);
@@ -193,6 +210,7 @@ export async function buildReport(
   }
 
   total = round2(total);
+  recurring = round2(recurring);
 
   let topCategory: string | null = null;
   let topAmount = 0;
@@ -223,6 +241,7 @@ export async function buildReport(
     count: occurrences.length,
     average,
     averageLabel,
+    recurring,
     topCategory,
     buckets,
     occurrences,
@@ -268,4 +287,40 @@ export async function getCategoryTotals(
   }
 
   return totals;
+}
+
+/** Normalizes a recurring expense's amount to an equivalent monthly charge. */
+function monthlyCharge(amount: number, frequency: Frequency): number {
+  switch (frequency) {
+    case "DAILY":
+      return round2((amount * 365) / 12);
+    case "WEEKLY":
+      return round2((amount * 52) / 12);
+    case "YEARLY":
+      return round2(amount / 12);
+    default:
+      return round2(amount);
+  }
+}
+
+/** Lists every recurring expense along with its equivalent monthly charge. */
+export async function getRecurringCharges(): Promise<RecurringCharge[]> {
+  const recurring = await prisma.expense.findMany({
+    where: { frequency: { not: null } },
+    orderBy: { title: "asc" },
+  });
+
+  return recurring.flatMap((expense) => {
+    if (!expense.frequency) return [];
+    return [
+      {
+        id: expense.id,
+        title: expense.title,
+        category: expense.category,
+        amount: expense.amount,
+        frequency: expense.frequency,
+        monthlyCharge: monthlyCharge(expense.amount, expense.frequency),
+      },
+    ];
+  });
 }

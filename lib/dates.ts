@@ -21,6 +21,13 @@ export function startOfDay(date: Date): Date {
   return d;
 }
 
+/** Formats a date as a "YYYY-MM" month key, used to key monthly budgets. */
+export function toMonthKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${year}-${month}`;
+}
+
 export function toISODate(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");

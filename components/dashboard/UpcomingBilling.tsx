@@ -28,20 +28,41 @@ export default function UpcomingBillingCard({ billing }: { billing: UpcomingBill
   const [open, setOpen] = useState(false);
 
   if (!open) {
+    const next = billing.bills[0];
+
     return (
       <button
         type="button"
         onClick={() => setOpen(true)}
         aria-expanded={false}
         aria-controls="upcoming-bills-panel"
-        className="flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 lg:max-w-sm"
+        className="flex w-full items-center justify-between gap-3 self-stretch rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 lg:max-w-sm"
       >
-        <span className="text-sm font-semibold text-slate-900">
-          View upcoming bills ·{" "}
-          <span className="font-bold text-indigo-600">{formatCurrency(billing.total)}</span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-500">
+            Upcoming bills
+            <span className="text-slate-300" aria-hidden="true">·</span>
+            <span className="text-slate-400">{billing.monthLabel}</span>
+          </span>
+          <span className="mt-1 flex items-baseline gap-1.5">
+            <span className="text-lg font-bold tracking-tight text-slate-900">
+              {formatCurrency(billing.total)}
+            </span>
+            <span className="text-xs font-medium text-slate-400">
+              {billing.count} {billing.count === 1 ? "bill" : "bills"}
+            </span>
+          </span>
+          {next ? (
+            <span className="mt-0.5 block truncate text-xs text-slate-500">
+              Next: {next.title} · {formatDate(next.date)}
+            </span>
+          ) : (
+            <span className="mt-0.5 block text-xs text-slate-400">
+              Nothing due this month
+            </span>
+          )}
         </span>
-        <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500">
-          {billing.monthLabel}
+        <span className="inline-flex shrink-0 items-center text-slate-400">
           <ChevronDownIcon className="h-4 w-4" />
         </span>
       </button>

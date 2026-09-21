@@ -37,3 +37,13 @@ model Expense {
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
 }
+
+/// The user's budget for a specific calendar month, keyed by `month` ("YYYY-MM").
+/// Changing the budget for one month never affects other months.
+model Budget {
+  id        String   @id @default(cuid())
+  month     String   @unique
+  amount    Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

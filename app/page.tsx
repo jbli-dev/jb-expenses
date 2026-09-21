@@ -1,10 +1,12 @@
 import { Suspense } from "react";
-import { buildReport, getExpenseCategories, getCategoryTotals } from "@/lib/reports";
+import { buildReport, getExpenseCategories, getCategoryTotals, getRecurringCharges } from "@/lib/reports";
 import { buildYearEndForecast } from "@/lib/forecast";
 import { buildUpcomingBilling } from "@/lib/billing";
-import { isPeriod, parseISODate, type Period } from "@/lib/dates";
+import { getMonthlyBudget, getMonthlySpending } from "@/lib/budget";
+import { isPeriod, parseISODate, toMonthKey, type Period } from "@/lib/dates";
 import PeriodSelector from "@/components/dashboard/PeriodSelector";
 import SummaryCards from "@/components/dashboard/SummaryCards";
+import MonthlyBudget from "@/components/dashboard/MonthlyBudget";
 import YearEndForecast from "@/components/dashboard/YearEndForecast";
 import SpendingChart from "@/components/dashboard/SpendingChart";
 import UpcomingBillingCard from "@/components/dashboard/UpcomingBilling";
@@ -28,12 +30,28 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       ? [params.category]
       : [];
   const categoryFilter = selectedCategories.length > 0 ? selectedCategories : undefined;
-  const [report, forecast, categories, billing, categoryTotals] = await Promise.all([
+  // The budget card is month-based: it follows the selected month in the
+  // monthly view and otherwise reflects the current calendar month.
+  const budgetMonth = period === "monthly" ? anchor : new Date();
+  const canEditBudget = toMonthKey(budgetMonth) === toMonthKey(new Date());
+  const [
+    report,
+    forecast,
+    categories,
+    billing,
+    categoryTotals,
+    budget,
+    monthlySpending,
+    recurringCharges,
+  ] = await Promise.all([
     buildReport(period, anchor, categoryFilter),
     buildYearEndForecast(anchor),
     getExpenseCategories(),
     buildUpcomingBilling(),
     getCategoryTotals(period, anchor),
+    getMonthlyBudget(budgetMonth),
+    getMonthlySpending(budgetMonth),
+    getRecurringCharges(),
   ]);
   const categoriesWithTotals = categories.map((category) => ({
     ...category,
@@ -50,6 +68,12 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Dashboard</h1>
           <p className="mt-1 text-sm text-slate-500">{report.label}</p>
         </div>
+      </div>
+
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="w-full max-w-md">
+          <MonthlyBudget budget={budget} spending={monthlySpending} editable={canEditBudget} />
+        </div>
         <UpcomingBillingCard billing={billing} />
       </div>
 
@@ -59,7 +83,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
         <PeriodSelector />
       </Suspense>
 
-      <SummaryCards report={report} />
+      <SummaryCards report={report} recurringCharges={recurringCharges} />
       <YearEndForecast forecast={forecast} />
       <Suspense fallback={<div className="card h-72 animate-pulse" />}>
         <SpendingChart
