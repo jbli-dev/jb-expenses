@@ -1,0 +1,39 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+//
+// NOTE: The datasource is currently SQLite for local development.
+// To switch to MySQL later, change the datasource below to:
+//   provider = "mysql"
+//   url      = env("DATABASE_URL")
+// and update DATABASE_URL in .env (e.g. mysql://user:pass@localhost:3306/db).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+/// How often a recurring expense repeats.
+enum Frequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+/// A single expense entry. When `frequency` is null the expense is one-time;
+/// otherwise it repeats starting on `date` at the given frequency.
+model Expense {
+  id        String     @id @default(cuid())
+  title     String
+  amount    Float
+  category  String?
+  date      DateTime
+  frequency Frequency?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
