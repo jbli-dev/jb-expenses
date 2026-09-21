@@ -2,7 +2,11 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { PERIODS, shiftAnchor, toISODate, type Period } from "@/lib/dates";
-import { ChevronLeftIcon, ChevronRightIcon } from "@/components/icons";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  PrinterIcon,
+} from "@/components/icons";
 
 function parseDate(value: string | null): Date {
   if (value) {
@@ -29,6 +33,20 @@ export default function PeriodSelector() {
       params.append("category", category);
     }
     router.push(`/?${params.toString()}`);
+  }
+
+  function openPrint() {
+    const params = new URLSearchParams();
+    if (period !== "weekly") params.set("period", period);
+    params.set("date", toISODate(anchor));
+    for (const category of searchParams.getAll("category")) {
+      params.append("category", category);
+    }
+    window.open(
+      `/print?${params.toString()}`,
+      "expense-report-print",
+      "width=1024,height=960",
+    );
   }
 
   return (
@@ -67,6 +85,15 @@ export default function PeriodSelector() {
           onClick={() => update(period, shiftAnchor(anchor, period, 1))}
         >
           <ChevronRightIcon />
+        </button>
+        <button
+          type="button"
+          className="btn-icon ml-2"
+          aria-label="Print report"
+          title="Open a print-friendly report"
+          onClick={openPrint}
+        >
+          <PrinterIcon />
         </button>
       </div>
     </div>
