@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Report, ReportOccurrence } from "@/lib/reports";
-import { formatCompactCurrency, formatCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import { startOfDay, type Period } from "@/lib/dates";
 import { CalendarIcon } from "@/components/icons";
 import CategoryFilter, { type CategoryFilterOption } from "./CategoryFilter";
@@ -163,8 +163,8 @@ export default function SpendingChart({
       >
         <defs>
           <linearGradient id="bar-gradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#818cf8" />
-            <stop offset="100%" stopColor="#6366f1" />
+            <stop offset="0%" stopColor="#6366f1" />
+            <stop offset="100%" stopColor="#4f46e5" />
           </linearGradient>
           <pattern
             id="bar-hatch"
@@ -188,6 +188,12 @@ export default function SpendingChart({
           const estimatedHeight = height - actualHeight;
           const showLabel = i % labelStep === 0;
           const isPastOrToday = bucketDate(report.period, bucket.key, periodStart).getTime() <= today;
+          const valueText = formatCurrency(bucket.total);
+          // Shrink the label when needed so the exact amount keeps clear of its slot edges.
+          const valueFontSize = Math.max(
+            5,
+            Math.min(7, (slot - 16) / Math.max(1, valueText.length) / 0.65),
+          );
           const tooltip = `${bucket.label} · total ${formatCurrency(bucket.total)} · actual ${formatCurrency(bucket.actual)} · estimated ${formatCurrency(bucket.estimated)} · click for details`;
 
           return (
@@ -203,17 +209,6 @@ export default function SpendingChart({
                 height={chartHeight}
                 rx={6}
               />
-              {isPastOrToday && (
-                <rect
-                  className="chart-bar-past-border"
-                  x={x}
-                  y={PAD_TOP}
-                  width={barWidth}
-                  height={chartHeight}
-                  rx={6}
-                  fill="none"
-                />
-              )}
               {height > 0 && (
                 <g clipPath={`url(#bar-clip-${bucket.key})`}>
                   {estimatedHeight > 0 && (
@@ -239,8 +234,14 @@ export default function SpendingChart({
                 </g>
               )}
               {showValues && height > 0 && (
-                <text className="chart-value" x={x + barWidth / 2} y={y - 5} textAnchor="middle">
-                  {formatCompactCurrency(bucket.total)}
+                <text
+                  className="chart-value"
+                  x={x + barWidth / 2}
+                  y={y - 6}
+                  textAnchor="middle"
+                  style={{ fontSize: valueFontSize }}
+                >
+                  {valueText}
                 </text>
               )}
               {showLabel && (
@@ -281,7 +282,7 @@ export default function SpendingChart({
 
       <div className="mt-3 flex items-center justify-end gap-4 text-xs text-slate-500">
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-3 w-3 rounded-[3px] bg-gradient-to-b from-indigo-400 to-indigo-600" aria-hidden="true" />
+          <span className="h-3 w-3 rounded-[3px] bg-gradient-to-b from-indigo-500 to-indigo-600" aria-hidden="true" />
           Actual
         </span>
         <span className="inline-flex items-center gap-1.5">

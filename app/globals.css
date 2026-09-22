@@ -110,7 +110,7 @@
 }
 
 .chart-column:hover .chart-bar {
-  fill: #4f46e5;
+  fill: #4338ca;
 }
 
 .chart-column:hover .chart-bar-estimated {
@@ -121,11 +121,6 @@
   fill: rgba(99, 102, 241, 0.08);
   stroke: #6366f1;
   stroke-width: 1.5;
-}
-
-.chart-bar-past-border {
-  stroke: #a5b4fc;
-  stroke-width: 1;
 }
 
 .chart-legend-hatch {
@@ -144,6 +139,5 @@
 
 .chart-value {
   fill: #64748b;
-  font-size: 10px;
   font-weight: 500;
 }
