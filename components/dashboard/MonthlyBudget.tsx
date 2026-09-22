@@ -3,18 +3,29 @@
 import { useActionState, useState } from "react";
 import { setBudget, type BudgetFormState } from "@/app/actions/budget";
 import { formatCurrency } from "@/lib/utils";
+import { formatMonthLabel } from "@/lib/dates";
 import { GearIcon } from "@/components/icons";
 
 interface MonthlyBudgetProps {
   budget: number | null;
   spending: number;
-  /** Whether the budget can be edited (only the current month). */
+  /** The "YYYY-MM" month this budget applies to. */
+  month: string;
+  /** Whether the budget can be edited (current and upcoming months). */
   editable?: boolean;
+  /** Whether `month` is the current calendar month. */
+  isCurrentMonth?: boolean;
 }
 
 const initialFormState: BudgetFormState = { error: null };
 
-export default function MonthlyBudget({ budget, spending, editable = true }: MonthlyBudgetProps) {
+export default function MonthlyBudget({
+  budget,
+  spending,
+  month,
+  editable = true,
+  isCurrentMonth = true,
+}: MonthlyBudgetProps) {
   const [state, formAction, pending] = useActionState(setBudget, initialFormState);
   const [editing, setEditing] = useState(false);
 
@@ -28,13 +39,16 @@ export default function MonthlyBudget({ budget, spending, editable = true }: Mon
       <div className="flex items-center gap-4">
         <div className="min-w-0 flex-1">
           <p className="stat-label">Monthly budget</p>
+          {!isCurrentMonth && (
+            <p className="text-[11px] font-medium text-slate-400">{formatMonthLabel(month)}</p>
+          )}
           <p className="mt-0.5 text-base font-bold tracking-tight text-slate-900">
             {hasBudget ? formatCurrency(budget) : "Not set"}
           </p>
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="stat-label">{editable ? "Spent this month" : "Spent"}</p>
+          <p className="stat-label">{isCurrentMonth ? "Spent this month" : "Spent"}</p>
           <p
             className={`mt-0.5 text-base font-bold tracking-tight ${
               overBudget
@@ -76,6 +90,7 @@ export default function MonthlyBudget({ budget, spending, editable = true }: Mon
 
       {editing && (
         <form action={formAction} className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+          <input type="hidden" name="month" value={month} />
           <label htmlFor="budget-amount" className="label sr-only">
             Monthly budget amount
           </label>

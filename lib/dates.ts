@@ -28,6 +28,36 @@ export function toMonthKey(date: Date): string {
   return `${year}-${month}`;
 }
 
+const MONTH_LABELS_SHORT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+/** Parses a "YYYY-MM" month key into the first day of that month, or null if invalid. */
+export function parseMonthKey(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const match = /^(\d{4})-(0[1-9]|1[0-2])$/.exec(value);
+  if (!match) return null;
+  return new Date(Number(match[1]), Number(match[2]) - 1, 1);
+}
+
+/** Formats a "YYYY-MM" month key as e.g. "Sep 2026". Falls back to the raw key. */
+export function formatMonthLabel(monthKey: string): string {
+  const date = parseMonthKey(monthKey);
+  if (!date) return monthKey;
+  return `${MONTH_LABELS_SHORT[date.getMonth()]} ${date.getFullYear()}`;
+}
+
 export function toISODate(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");

@@ -7,10 +7,11 @@ import { PrismaClient } from "../generated/prisma/client";
  *
  * The recurring-amount model resolves each occurrence to the latest
  * `RecurringAmount` row whose `effectiveFrom` is on or before the occurrence
- * date. We move the expense's start date to Jan 1, 2026 and pin each month
- * boundary to its historical amount:
- *   Jan 1 – $80 (Jan–Jun), Jul 1 – $73.68 (July), Aug 1 – $65 (August),
- *   Sep 1 – $75 (September onward).
+ * date. Optimum bills on the 22nd of each month, so we move the expense's
+ * start date to Jan 22, 2026 and pin each monthly boundary to its historical
+ * amount:
+ *   Jan 22 – $80 (Jan–Jun), Jul 22 – $73.68 (July), Aug 22 – $65 (August),
+ *   Sep 22 – $75 (September onward).
  */
 
 function resolveDatasourceUrl(url: string | undefined): string {
@@ -102,16 +103,17 @@ async function main() {
     return;
   }
 
-  const startDate = localDate(2026, 0, 1);
+  const startDate = localDate(2026, 0, 22);
   const finalAmount = 75;
 
   for (const expense of expenses) {
-    // 2026 schedule: Jan–Jun $80, Jul $73.68, Aug $65, Sep onward $75.
+    // 2026 schedule (billed on the 22nd): Jan–Jun $80, Jul $73.68, Aug $65,
+    // Sep onward $75.
     const schedule = [
-      { amount: 80, date: localDate(2026, 0, 1) },
-      { amount: 73.68, date: localDate(2026, 6, 1) },
-      { amount: 65, date: localDate(2026, 7, 1) },
-      { amount: finalAmount, date: localDate(2026, 8, 1) },
+      { amount: 80, date: localDate(2026, 0, 22) },
+      { amount: 73.68, date: localDate(2026, 6, 22) },
+      { amount: 65, date: localDate(2026, 7, 22) },
+      { amount: finalAmount, date: localDate(2026, 8, 22) },
     ];
 
     const actions: string[] = [];
@@ -123,21 +125,23 @@ async function main() {
       }
     }
 
-    // Drop any rows after the final pinned boundary (e.g. a stale
-    // "effectiveFrom = today" row) so Sep 1 is the last pin.
-    const redundant = await prisma.recurringAmount.findMany({
-      where: {
-        expenseId: expense.id,
-        effectiveFrom: { gte: dayAfter(localDate(2026, 8, 1)) },
-      },
+    // Remove any rows that don't sit on a pinned 22nd boundary (e.g. stale
+    // day-1 rows from the previous schedule) so the four pins above are the
+    // only amount history.
+    const pinnedTimes = new Set(schedule.map((entry) => entry.date.getTime()));
+    const stale = await prisma.recurringAmount.findMany({
+      where: { expenseId: expense.id },
     });
-    for (const row of redundant) {
-      await prisma.recurringAmount.delete({ where: { id: row.id } });
-      actions.push(`removed redundant $${row.amount} @ ${row.effectiveFrom.toISOString()}`);
+    for (const row of stale) {
+      if (!pinnedTimes.has(row.effectiveFrom.getTime())) {
+        await prisma.recurringAmount.delete({ where: { id: row.id } });
+        actions.push(`removed stale $${row.amount} @ ${row.effectiveFrom.toISOString()}`);
+      }
     }
 
-    // Recurring occurrences start at the expense's `date`; move it to Jan 1,
-    // 2026 and keep the current amount at the Sep-onward charge.
+    // Recurring occurrences start at the expense's `date`; move it to Jan 22,
+    // 2026 so monthly charges fall on the 22nd, and keep the current amount at
+    // the Sep-onward charge.
     if (expense.date.getTime() !== startDate.getTime() || expense.amount !== finalAmount) {
       await prisma.expense.update({
         where: { id: expense.id },

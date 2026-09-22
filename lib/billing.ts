@@ -28,10 +28,12 @@ function round2(value: number): number {
 
 /**
  * Lists the next due occurrence of each recurring expense that falls within
- * the current calendar month (from today through the end of the month).
+ * the current calendar month (after today through the end of the month).
  */
 export async function buildUpcomingBilling(asOf: Date = new Date()): Promise<UpcomingBilling> {
   const today = startOfDay(asOf);
+  const upcomingStart = new Date(today);
+  upcomingStart.setDate(upcomingStart.getDate() + 1);
   const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 1);
 
   const recurring = await prisma.expense.findMany({
@@ -44,7 +46,7 @@ export async function buildUpcomingBilling(asOf: Date = new Date()): Promise<Upc
 
   for (const expense of recurring) {
     if (!expense.frequency) continue;
-    const next = generateOccurrences(expense.date, expense.frequency, today, monthEnd)[0];
+    const next = generateOccurrences(expense.date, expense.frequency, upcomingStart, monthEnd)[0];
     if (!next) continue;
     bills.push({
       id: expense.id,

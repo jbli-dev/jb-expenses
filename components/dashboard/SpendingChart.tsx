@@ -27,6 +27,22 @@ const itemDateFormatter = new Intl.DateTimeFormat("en-US", {
   day: "numeric",
 });
 
+/** Returns an English ordinal suffix for a day-of-month number. */
+function ordinalSuffix(day: number): string {
+  const rem100 = day % 100;
+  if (rem100 >= 11 && rem100 <= 13) return "th";
+  switch (day % 10) {
+    case 1:
+      return "st";
+    case 2:
+      return "nd";
+    case 3:
+      return "rd";
+    default:
+      return "th";
+  }
+}
+
 /** Maps an occurrence to the chart bucket key it contributes to. */
 function bucketKeyForOccurrence(period: Period, date: Date, start: Date): string {
   if (period === "weekly") {
@@ -188,6 +204,7 @@ export default function SpendingChart({
           const estimatedHeight = height - actualHeight;
           const showLabel = i % labelStep === 0;
           const isPastOrToday = bucketDate(report.period, bucket.key, periodStart).getTime() <= today;
+          const bucketDay = bucketDate(report.period, bucket.key, periodStart);
           const valueText = formatCurrency(bucket.total);
           // Shrink the label when needed so the exact amount keeps clear of its slot edges.
           const valueFontSize = Math.max(
@@ -252,7 +269,14 @@ export default function SpendingChart({
                   textAnchor="middle"
                   fontWeight={isPastOrToday ? 700 : undefined}
                 >
-                  {bucket.label}
+                  {report.period === "weekly" ? (
+                    <>
+                      {bucket.label}
+                      <tspan fontSize={8}>{` ${bucketDay.getDate()}${ordinalSuffix(bucketDay.getDate())}`}</tspan>
+                    </>
+                  ) : (
+                    bucket.label
+                  )}
                 </text>
               )}
               <rect

@@ -35,9 +35,13 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       : [];
   const categoryFilter = selectedCategories.length > 0 ? selectedCategories : undefined;
   // The budget card is month-based: it follows the selected month in the
-  // monthly view and otherwise reflects the current calendar month.
+  // monthly view and otherwise reflects the current calendar month. Budgets
+  // are recorded per month so upcoming months can carry their own amount;
+  // editing is allowed for the current month and any future month.
   const budgetMonth = period === "monthly" ? anchor : new Date();
-  const canEditBudget = toMonthKey(budgetMonth) === toMonthKey(new Date());
+  const budgetMonthKey = toMonthKey(budgetMonth);
+  const currentMonthKey = toMonthKey(new Date());
+  const canEditBudget = budgetMonthKey >= currentMonthKey;
   const [
     report,
     forecast,
@@ -80,7 +84,14 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="w-full max-w-md">
-          <MonthlyBudget budget={budget} spending={monthlySpending} editable={canEditBudget} />
+          <MonthlyBudget
+            key={budgetMonthKey}
+            budget={budget}
+            spending={monthlySpending}
+            month={budgetMonthKey}
+            isCurrentMonth={budgetMonthKey === currentMonthKey}
+            editable={canEditBudget}
+          />
         </div>
         <UpcomingBillingCard billing={billing} />
       </div>
