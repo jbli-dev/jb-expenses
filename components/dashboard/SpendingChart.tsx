@@ -59,6 +59,20 @@ function bucketDateLabel(period: Period, key: string, start: Date): string {
   return new Intl.DateTimeFormat("en-US", { month: "long" }).format(date);
 }
 
+/** The calendar date a bucket represents. */
+function bucketDate(period: Period, key: string, start: Date): Date {
+  const index = Number(key.slice(1));
+  if (period === "weekly") {
+    const date = new Date(start);
+    date.setDate(date.getDate() + index);
+    return startOfDay(date);
+  }
+  if (period === "monthly") {
+    return startOfDay(new Date(start.getFullYear(), start.getMonth(), index + 1));
+  }
+  return startOfDay(new Date(start.getFullYear(), index, 1));
+}
+
 export default function SpendingChart({
   report,
   categories,
@@ -119,6 +133,7 @@ export default function SpendingChart({
 
   const activeItems = activeBucket ? (itemsByBucket.get(activeBucket.key) ?? []) : [];
   const today = startOfDay(new Date()).getTime();
+  const periodStart = startOfDay(new Date(report.start));
 
   return (
     <>
@@ -172,6 +187,7 @@ export default function SpendingChart({
           const actualHeight = height * ratio;
           const estimatedHeight = height - actualHeight;
           const showLabel = i % labelStep === 0;
+          const isPastOrToday = bucketDate(report.period, bucket.key, periodStart).getTime() <= today;
           const tooltip = `${bucket.label} · total ${formatCurrency(bucket.total)} · actual ${formatCurrency(bucket.actual)} · estimated ${formatCurrency(bucket.estimated)} · click for details`;
 
           return (
@@ -187,6 +203,17 @@ export default function SpendingChart({
                 height={chartHeight}
                 rx={6}
               />
+              {isPastOrToday && (
+                <rect
+                  className="chart-bar-past-border"
+                  x={x}
+                  y={PAD_TOP}
+                  width={barWidth}
+                  height={chartHeight}
+                  rx={6}
+                  fill="none"
+                />
+              )}
               {height > 0 && (
                 <g clipPath={`url(#bar-clip-${bucket.key})`}>
                   {estimatedHeight > 0 && (
@@ -222,6 +249,7 @@ export default function SpendingChart({
                   x={x + barWidth / 2}
                   y={CHART_HEIGHT - 10}
                   textAnchor="middle"
+                  fontWeight={isPastOrToday ? 700 : undefined}
                 >
                   {bucket.label}
                 </text>

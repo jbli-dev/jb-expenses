@@ -123,6 +123,11 @@
   stroke-width: 1.5;
 }
 
+.chart-bar-past-border {
+  stroke: #a5b4fc;
+  stroke-width: 1;
+}
+
 .chart-legend-hatch {
   background-color: #e0e7ff;
   background-image: repeating-linear-gradient(

@@ -3,9 +3,9 @@ import { formatCurrency } from "@/lib/utils";
 import RecurringSpendingCard from "./RecurringSpendingCard";
 
 function periodNoun(period: Report["period"]): string {
-  if (period === "weekly") return "this week";
-  if (period === "monthly") return "this month";
-  return "this year";
+  if (period === "weekly") return "the week";
+  if (period === "monthly") return "the month";
+  return "the year";
 }
 
 export default function SummaryCards({
@@ -24,7 +24,7 @@ export default function SummaryCards({
         <p className="stat-value">{formatCurrency(report.total)}</p>
         <p className="stat-sub">
           <span className="font-medium text-slate-600">{formatCurrency(report.actual)}</span>{" "}
-          spent so far {periodNoun(report.period)}
+          spent for {periodNoun(report.period)}
         </p>
       </div>
       <div className="card p-5">
