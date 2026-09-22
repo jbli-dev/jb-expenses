@@ -142,7 +142,7 @@ async function collectOccurrences(
       orderBy: { date: "asc" },
     }),
     prisma.expense.findMany({
-      where: { frequency: { not: null }, date: { lt: end }, ...categoriesWhere(categories) },
+      where: { frequency: { not: null }, ...categoriesWhere(categories) },
       include: { amounts: { orderBy: { effectiveFrom: "asc" } } },
       orderBy: { date: "asc" },
     }),
@@ -163,7 +163,9 @@ async function collectOccurrences(
 
   for (const expense of recurring) {
     if (!expense.frequency) continue;
-    for (const date of generateOccurrences(expense.date, expense.frequency, start, end, period === "yearly")) {
+    // Generate occurrences only from the item's start date forward, so a newly
+    // added recurring item doesn't appear in periods before it was created.
+    for (const date of generateOccurrences(expense.date, expense.frequency, start, end)) {
       occurrences.push({
         id: expense.id,
         title: expense.title,

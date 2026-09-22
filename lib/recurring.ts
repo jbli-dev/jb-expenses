@@ -7,8 +7,8 @@ export interface AmountEntry {
 /**
  * Returns the amount in effect on `date` for a recurring expense, choosing the
  * latest entry whose `effectiveFrom` is on or before `date`. Falls back to the
- * earliest entry so dates before the first recorded amount (e.g. backfilled
- * yearly occurrences) still resolve to the initial amount.
+ * earliest entry so dates before the first recorded amount still resolve to the
+ * initial amount.
  */
 export function resolveAmount(entries: AmountEntry[], date: Date): number {
   let latest: AmountEntry | null = null;

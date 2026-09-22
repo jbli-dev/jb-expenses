@@ -117,67 +117,23 @@ export function addInterval(date: Date, frequency: Frequency): Date {
   return d;
 }
 
-/** Steps a date backwards by one interval, mirroring `addInterval`. */
-export function subtractInterval(date: Date, frequency: Frequency): Date {
-  const d = new Date(date);
-
-  switch (frequency) {
-    case "DAILY":
-      d.setDate(d.getDate() - 1);
-      break;
-    case "WEEKLY":
-      d.setDate(d.getDate() - 7);
-      break;
-    case "MONTHLY": {
-      const day = d.getDate();
-      d.setDate(1);
-      d.setMonth(d.getMonth() - 1);
-      const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-      d.setDate(Math.min(day, lastDay));
-      break;
-    }
-    case "YEARLY": {
-      const month = d.getMonth();
-      const day = d.getDate();
-      const prevYear = d.getFullYear() - 1;
-      if (month === 1 && day === 29 && !isLeapYear(prevYear)) {
-        d.setFullYear(prevYear);
-        d.setMonth(1);
-        d.setDate(28);
-      } else {
-        d.setFullYear(prevYear);
-      }
-      break;
-    }
-  }
-
-  return d;
-}
-
+/**
+ * Generates occurrences of a recurring expense from its `startDate` forward,
+ * clipped to `[rangeStart, rangeEnd)`. Occurrences never extend before
+ * `startDate`, so an item only appears from the date it was created onward.
+ */
 export function generateOccurrences(
   startDate: Date,
   frequency: Frequency,
   rangeStart: Date,
   rangeEnd: Date,
-  backfill = false,
 ): Date[] {
   const occurrences: Date[] = [];
   let current = new Date(startDate);
   let guard = 0;
 
-  // When backfilling, extend the schedule backwards from `startDate` to the
-  // first occurrence on or after `rangeStart` (e.g. a monthly charge created
-  // in September is treated as having run since January in a yearly report).
-  if (backfill && current.getTime() > rangeStart.getTime()) {
-    while (guard < 100_000) {
-      const prev = subtractInterval(current, frequency);
-      if (prev.getTime() >= current.getTime()) break;
-      if (prev.getTime() < rangeStart.getTime()) break;
-      current = prev;
-      guard += 1;
-    }
-  }
-
+  // Advance to the first occurrence at or after `rangeStart` when the item
+  // started before the viewing period.
   while (current < rangeStart && guard < 100_000) {
     const next = addInterval(current, frequency);
     if (next.getTime() <= current.getTime()) break;
