@@ -1,16 +1,15 @@
 import "dotenv/config";
 import path from "node:path";
 import { PrismaClient } from "../generated/prisma/client";
+import { applyNySalesTax } from "../lib/tax";
 
 /**
- * Backfill script: reconcile the "Optimum" recurring expense's 2026 history.
+ * Backfill script: reconcile the "Spotify" recurring expense's 2026 history.
  *
- * The recurring-amount model resolves each occurrence to the latest
- * `RecurringAmount` row whose `effectiveFrom` is on or before the occurrence
- * date. We move the expense's start date to Jan 1, 2026 and pin each month
- * boundary to its historical amount:
- *   Jan 1 – $80 (Jan–Jun), Jul 1 – $73.68 (July), Aug 1 – $65 (August),
- *   Sep 1 – $75 (September onward).
+ * Spotify charges pre-tax amounts with NY sales tax applied on top:
+ *   Jan–Feb $19 + tax, Mar onward $21.99 + tax. We move the start date to
+ *   Jan 1, 2026 and pin each month boundary to its taxed amount:
+ *   Jan 1 – $20.69 (Jan–Feb), Mar 1 – $23.94 (March onward).
  */
 
 function resolveDatasourceUrl(url: string | undefined): string {
@@ -92,26 +91,24 @@ async function ensureAmount(
 async function main() {
   const expenses = await prisma.expense.findMany({
     where: {
-      OR: [{ title: { contains: "Optimum" } }, { title: { contains: "optimum" } }],
+      OR: [{ title: { contains: "Spotify" } }, { title: { contains: "spotify" } }],
     },
     include: { amounts: { orderBy: { effectiveFrom: "asc" } } },
   });
 
   if (expenses.length === 0) {
-    console.log("No Optimum expense found; nothing to do.");
+    console.log("No Spotify expense found; nothing to do.");
     return;
   }
 
   const startDate = localDate(2026, 0, 1);
-  const finalAmount = 75;
+  const finalAmount = applyNySalesTax(21.99);
 
   for (const expense of expenses) {
-    // 2026 schedule: Jan–Jun $80, Jul $73.68, Aug $65, Sep onward $75.
+    // 2026 schedule: Jan–Feb $19 + tax, Mar onward $21.99 + tax.
     const schedule = [
-      { amount: 80, date: localDate(2026, 0, 1) },
-      { amount: 73.68, date: localDate(2026, 6, 1) },
-      { amount: 65, date: localDate(2026, 7, 1) },
-      { amount: finalAmount, date: localDate(2026, 8, 1) },
+      { amount: applyNySalesTax(19), date: localDate(2026, 0, 1) },
+      { amount: finalAmount, date: localDate(2026, 2, 1) },
     ];
 
     const actions: string[] = [];
@@ -123,12 +120,12 @@ async function main() {
       }
     }
 
-    // Drop any rows after the final pinned boundary (e.g. a stale
-    // "effectiveFrom = today" row) so Sep 1 is the last pin.
+    // Drop any rows after the final pinned boundary (e.g. the original
+    // "effectiveFrom = expense.date" row) so Mar 1 is the last pin.
     const redundant = await prisma.recurringAmount.findMany({
       where: {
         expenseId: expense.id,
-        effectiveFrom: { gte: dayAfter(localDate(2026, 8, 1)) },
+        effectiveFrom: { gte: dayAfter(localDate(2026, 2, 1)) },
       },
     });
     for (const row of redundant) {
@@ -137,7 +134,7 @@ async function main() {
     }
 
     // Recurring occurrences start at the expense's `date`; move it to Jan 1,
-    // 2026 and keep the current amount at the Sep-onward charge.
+    // 2026 and keep the current amount at the Mar-onward charge.
     if (expense.date.getTime() !== startDate.getTime() || expense.amount !== finalAmount) {
       await prisma.expense.update({
         where: { id: expense.id },
