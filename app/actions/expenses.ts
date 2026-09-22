@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { applyNySalesTax } from "@/lib/tax";
+import { startOfDay } from "@/lib/dates";
 import { Frequency } from "@/generated/prisma/enums";
 
 export interface ExpenseFormState {
@@ -28,6 +30,7 @@ function parseExpenseForm(formData: FormData): ParsedExpenseForm {
   const dateRaw = String(formData.get("date") ?? "").trim();
   const type = String(formData.get("type") ?? "once");
   const frequencyRaw = String(formData.get("frequency") ?? "").trim();
+  const includeTax = formData.get("includeTax") === "on";
 
   if (!title) {
     return { error: "Please enter a title." };
@@ -51,7 +54,9 @@ function parseExpenseForm(formData: FormData): ParsedExpenseForm {
     frequency = frequencyRaw as Frequency;
   }
 
-  return { title, amount, category, date, frequency };
+  const finalAmount = includeTax ? applyNySalesTax(amount) : amount;
+
+  return { title, amount: finalAmount, category, date, frequency };
 }
 
 export async function createExpense(
@@ -63,9 +68,19 @@ export async function createExpense(
     return { error: parsed.error };
   }
 
-  await prisma.expense.create({
+  const created = await prisma.expense.create({
     data: parsed,
   });
+
+  if (parsed.frequency) {
+    await prisma.recurringAmount.create({
+      data: {
+        expenseId: created.id,
+        amount: parsed.amount,
+        effectiveFrom: parsed.date,
+      },
+    });
+  }
 
   revalidatePath("/");
   redirect("/");
@@ -93,10 +108,32 @@ export async function updateExpense(
     return { error: parsed.error };
   }
 
+  const existing = await prisma.expense.findUnique({ where: { id } });
+  if (!existing) {
+    return { error: "Expense not found." };
+  }
+
   await prisma.expense.update({
     where: { id },
     data: parsed,
-  }).catch(() => null);
+  });
+
+  if (parsed.frequency) {
+    if (!existing.frequency) {
+      // One-time → recurring: seed the initial amount history.
+      await prisma.recurringAmount.create({
+        data: { expenseId: id, amount: parsed.amount, effectiveFrom: parsed.date },
+      });
+    } else if (parsed.amount !== existing.amount) {
+      // Amount changed: record the new amount as effective from today.
+      await prisma.recurringAmount.create({
+        data: { expenseId: id, amount: parsed.amount, effectiveFrom: startOfDay(new Date()) },
+      });
+    }
+  } else if (existing.frequency) {
+    // Recurring → one-time: clear amount history.
+    await prisma.recurringAmount.deleteMany({ where: { expenseId: id } });
+  }
 
   revalidatePath("/");
   redirect(safeRedirect(formData.get("returnTo")));

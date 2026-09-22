@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import ExpenseForm from "@/components/expense/ExpenseForm";
 import { ChevronLeftIcon } from "@/components/icons";
 import { prisma } from "@/lib/prisma";
+import { requireUser } from "@/lib/auth";
 import { toISODate } from "@/lib/dates";
 
 function buildReturnTo(
@@ -27,6 +28,7 @@ export default async function EditExpensePage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ period?: string; date?: string }>;
 }) {
+  await requireUser();
   const [{ id }, query] = await Promise.all([params, searchParams]);
   const expense = await prisma.expense.findUnique({ where: { id } });
 

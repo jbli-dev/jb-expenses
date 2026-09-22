@@ -1,8 +1,11 @@
 import Link from "next/link";
 import ExpenseForm from "@/components/expense/ExpenseForm";
 import { ChevronLeftIcon } from "@/components/icons";
+import { requireUser } from "@/lib/auth";
 
-export default function NewExpensePage() {
+export default async function NewExpensePage() {
+  await requireUser();
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <Link href="/" className="btn-ghost">

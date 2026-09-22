@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { Frequency } from "@/generated/prisma/enums";
+import { resolveAmount } from "@/lib/recurring";
 import {
   formatRangeLabel,
   generateOccurrences,
@@ -52,11 +53,15 @@ export interface Report {
   end: Date;
   label: string;
   total: number;
+  /** Spend that has actually occurred on or before today. */
+  actual: number;
   count: number;
   average: number;
   averageLabel: string;
   /** Total spend from recurring expenses within the period. */
   recurring: number;
+  /** Recurring spend that has actually occurred on or before today. */
+  actualRecurring: number;
   topCategory: string | null;
   buckets: Bucket[];
   occurrences: ReportOccurrence[];
@@ -138,6 +143,7 @@ async function collectOccurrences(
     }),
     prisma.expense.findMany({
       where: { frequency: { not: null }, date: { lt: end }, ...categoriesWhere(categories) },
+      include: { amounts: { orderBy: { effectiveFrom: "asc" } } },
       orderBy: { date: "asc" },
     }),
   ]);
@@ -157,12 +163,12 @@ async function collectOccurrences(
 
   for (const expense of recurring) {
     if (!expense.frequency) continue;
-    for (const date of generateOccurrences(expense.date, expense.frequency, start, end)) {
+    for (const date of generateOccurrences(expense.date, expense.frequency, start, end, period === "yearly")) {
       occurrences.push({
         id: expense.id,
         title: expense.title,
         category: expense.category,
-        amount: expense.amount,
+        amount: resolveAmount(expense.amounts, date),
         date,
         frequency: expense.frequency,
       });
@@ -183,15 +189,24 @@ export async function buildReport(
   const buckets = buildBuckets(period, start, end);
 
   let total = 0;
+  let actual = 0;
   let recurring = 0;
+  let actualRecurring = 0;
   const categoryTotals = new Map<string, number>();
   const today = startOfDay(new Date());
 
   for (const occurrence of occurrences) {
     total += occurrence.amount;
 
+    if (occurrence.date.getTime() <= today.getTime()) {
+      actual += occurrence.amount;
+    }
+
     if (occurrence.frequency) {
       recurring += occurrence.amount;
+      if (occurrence.date.getTime() <= today.getTime()) {
+        actualRecurring += occurrence.amount;
+      }
     }
 
     const category = occurrence.category ?? "Other";
@@ -210,7 +225,9 @@ export async function buildReport(
   }
 
   total = round2(total);
+  actual = round2(actual);
   recurring = round2(recurring);
+  actualRecurring = round2(actualRecurring);
 
   let topCategory: string | null = null;
   let topAmount = 0;
@@ -238,10 +255,12 @@ export async function buildReport(
     end,
     label: formatRangeLabel(period, start, end),
     total,
+    actual,
     count: occurrences.length,
     average,
     averageLabel,
     recurring,
+    actualRecurring,
     topCategory,
     buckets,
     occurrences,
@@ -307,19 +326,21 @@ function monthlyCharge(amount: number, frequency: Frequency): number {
 export async function getRecurringCharges(): Promise<RecurringCharge[]> {
   const recurring = await prisma.expense.findMany({
     where: { frequency: { not: null } },
+    include: { amounts: { orderBy: { effectiveFrom: "asc" } } },
     orderBy: { title: "asc" },
   });
 
   return recurring.flatMap((expense) => {
     if (!expense.frequency) return [];
+    const amount = resolveAmount(expense.amounts, new Date());
     return [
       {
         id: expense.id,
         title: expense.title,
         category: expense.category,
-        amount: expense.amount,
+        amount,
         frequency: expense.frequency,
-        monthlyCharge: monthlyCharge(expense.amount, expense.frequency),
+        monthlyCharge: monthlyCharge(amount, expense.frequency),
       },
     ];
   });

@@ -22,7 +22,10 @@ export default function SummaryCards({
       <div className="card p-5">
         <p className="stat-label">Total spent</p>
         <p className="stat-value">{formatCurrency(report.total)}</p>
-        <p className="stat-sub">{periodNoun(report.period)}</p>
+        <p className="stat-sub">
+          <span className="font-medium text-slate-600">{formatCurrency(report.actual)}</span>{" "}
+          spent so far {periodNoun(report.period)}
+        </p>
       </div>
       <div className="card p-5">
         <p className="stat-label">Transactions</p>
@@ -34,7 +37,11 @@ export default function SummaryCards({
         <p className="stat-value">{formatCurrency(report.average)}</p>
         <p className="stat-sub">{report.averageLabel}</p>
       </div>
-      <RecurringSpendingCard value={formatCurrency(report.recurring)} charges={recurringCharges} />
+      <RecurringSpendingCard
+        value={formatCurrency(report.recurring)}
+        actualValue={formatCurrency(report.actualRecurring)}
+        charges={recurringCharges}
+      />
       <div className="card p-5">
         <p className="stat-label">Top category</p>
         <p className="stat-value">{topCategory ?? "—"}</p>

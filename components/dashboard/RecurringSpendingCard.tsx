@@ -13,9 +13,11 @@ const FREQUENCY_LABELS: Record<string, string> = {
 
 export default function RecurringSpendingCard({
   value,
+  actualValue,
   charges,
 }: {
   value: string;
+  actualValue: string;
   charges: RecurringCharge[];
 }) {
   const [open, setOpen] = useState(false);
@@ -46,7 +48,10 @@ export default function RecurringSpendingCard({
       >
         <p className="stat-label">Recurring spending</p>
         <p className="stat-value">{value}</p>
-        <p className="stat-sub">recurrent charges</p>
+        <p className="stat-sub">
+          <span className="font-medium text-slate-600">{actualValue}</span>{" "}
+          spent so far
+        </p>
       </button>
 
       {open && (

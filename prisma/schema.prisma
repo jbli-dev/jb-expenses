@@ -26,16 +26,33 @@ enum Frequency {
 }
 
 /// A single expense entry. When `frequency` is null the expense is one-time;
-/// otherwise it repeats starting on `date` at the given frequency.
+/// otherwise it repeats starting on `date` at the given frequency. For
+/// recurring expenses `amount` holds the current charge amount, while the
+/// point-in-time history lives in `RecurringAmount`.
 model Expense {
-  id        String     @id @default(cuid())
+  id        String            @id @default(cuid())
   title     String
   amount    Float
   category  String?
   date      DateTime
   frequency Frequency?
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  amounts   RecurringAmount[]
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+}
+
+/// A point-in-time amount for a recurring expense. The amount in effect for a
+/// given occurrence date is the latest row whose `effectiveFrom` is on or
+/// before that date (falling back to the earliest row for backfilled dates).
+model RecurringAmount {
+  id            String   @id @default(cuid())
+  expenseId     String
+  expense       Expense  @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  amount        Float
+  effectiveFrom DateTime
+  createdAt     DateTime @default(now())
+
+  @@index([expenseId, effectiveFrom])
 }
 
 /// The user's budget for a specific calendar month, keyed by `month` ("YYYY-MM").
@@ -46,4 +63,27 @@ model Budget {
   amount    Float
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+/// A registered user account. Accounts are created by signing in with Google.
+model User {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  name      String?
+  image     String?
+  googleId  String?   @unique
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  sessions  Session[]
+}
+
+/// A server-side login session. The cookie stores the raw token while the
+/// database stores only its SHA-256 hash, so a leaked DB row can't be replayed.
+model Session {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
 }

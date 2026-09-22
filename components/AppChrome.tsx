@@ -3,15 +3,28 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { PlusIcon } from "@/components/icons";
+import { logout } from "@/app/actions/auth";
 
-export default function AppChrome({ children }: { children: ReactNode }) {
+export interface SessionUser {
+  name: string | null;
+  email: string;
+  image: string | null;
+}
+
+interface AppChromeProps {
+  user: SessionUser | null;
+  children: ReactNode;
+}
+
+export default function AppChrome({ user, children }: AppChromeProps) {
   const pathname = usePathname();
 
-  // The print view is a standalone, print-optimized page: no app chrome.
-  if (pathname === "/print") {
+  // The print view and login page are standalone pages: no app chrome.
+  if (pathname === "/print" || pathname === "/login") {
     return <>{children}</>;
   }
+
+  const initial = (user?.name ?? user?.email ?? "?").charAt(0).toUpperCase();
 
   return (
     <div className="flex min-h-full flex-col">
@@ -23,10 +36,38 @@ export default function AppChrome({ children }: { children: ReactNode }) {
               Expense Tracker
             </span>
           </Link>
-          <Link href="/expenses/new" className="btn-primary">
-            <PlusIcon />
-            Add expense
-          </Link>
+
+          <div className="flex items-center gap-3">
+            {user ? (
+              <>
+                <form action={logout} className="flex items-center gap-2">
+                  {user.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={user.image}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                      className="h-8 w-8 rounded-full"
+                    />
+                  ) : (
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-sm font-semibold text-indigo-700">
+                      {initial}
+                    </span>
+                  )}
+                  <span className="hidden max-w-[12rem] truncate text-sm font-medium text-slate-700 sm:block">
+                    {user.name ?? user.email}
+                  </span>
+                  <button type="submit" className="btn-ghost">
+                    Sign out
+                  </button>
+                </form>
+              </>
+            ) : (
+              <Link href="/login" className="btn-ghost">
+                Sign in
+              </Link>
+            )}
+          </div>
         </div>
       </header>
 

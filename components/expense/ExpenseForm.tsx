@@ -3,6 +3,8 @@
 import { useActionState, useState } from "react";
 import Link from "next/link";
 import { createExpense, updateExpense, type ExpenseFormState } from "@/app/actions/expenses";
+import { applyNySalesTax, NY_SALES_TAX_RATE } from "@/lib/tax";
+import { formatCurrency } from "@/lib/utils";
 
 const CATEGORIES = [
   "Food",
@@ -49,6 +51,13 @@ export default function ExpenseForm({
   const [type, setType] = useState<"once" | "recurring">(
     expense?.frequency ? "recurring" : "once",
   );
+  const [amountValue, setAmountValue] = useState(
+    expense ? String(expense.amount) : "",
+  );
+  const [includeTax, setIncludeTax] = useState(true);
+
+  const parsedAmount = Number.parseFloat(amountValue);
+  const showTaxPreview = includeTax && !Number.isNaN(parsedAmount) && parsedAmount > 0;
 
   const cancelHref = returnTo ?? "/";
 
@@ -89,9 +98,30 @@ export default function ExpenseForm({
             min="0"
             className="input"
             placeholder="0.00"
-            defaultValue={expense ? String(expense.amount) : ""}
+            value={amountValue}
+            onChange={(e) => setAmountValue(e.target.value)}
             required
           />
+          <label className="mt-3 flex items-start gap-2 text-sm text-slate-600">
+            <input
+              type="checkbox"
+              name="includeTax"
+              checked={includeTax}
+              onChange={(e) => setIncludeTax(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            <span>
+              Auto-calculate tax{" "}
+              <span className="text-slate-400">
+                (add {Math.round(NY_SALES_TAX_RATE * 1000) / 10}% NY sales tax)
+              </span>
+            </span>
+          </label>
+          {showTaxPreview && (
+            <p className="mt-1 text-sm text-slate-500">
+              Total with tax: {formatCurrency(applyNySalesTax(parsedAmount))}
+            </p>
+          )}
         </div>
 
         <div>

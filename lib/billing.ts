@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { generateOccurrences, startOfDay, toISODate } from "@/lib/dates";
+import { resolveAmount } from "@/lib/recurring";
 import type { Frequency } from "@/generated/prisma/enums";
 
 /** A single upcoming recurring charge within the current month. */
@@ -35,6 +36,7 @@ export async function buildUpcomingBilling(asOf: Date = new Date()): Promise<Upc
 
   const recurring = await prisma.expense.findMany({
     where: { frequency: { not: null }, date: { lt: monthEnd } },
+    include: { amounts: { orderBy: { effectiveFrom: "asc" } } },
     orderBy: { date: "asc" },
   });
 
@@ -48,7 +50,7 @@ export async function buildUpcomingBilling(asOf: Date = new Date()): Promise<Upc
       id: expense.id,
       title: expense.title,
       category: expense.category,
-      amount: expense.amount,
+      amount: resolveAmount(expense.amounts, next),
       date: toISODate(next),
       frequency: expense.frequency,
     });

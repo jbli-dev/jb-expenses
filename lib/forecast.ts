@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { generateOccurrences, startOfDay } from "@/lib/dates";
+import { resolveAmount } from "@/lib/recurring";
 
 const DAY_MS = 86_400_000;
 
@@ -59,6 +60,7 @@ export async function buildYearEndForecast(anchor: Date): Promise<YearEndForecas
   // Exact recurring projection for [asOf, yearEnd).
   const recurring = await prisma.expense.findMany({
     where: { frequency: { not: null }, date: { lt: yearEnd } },
+    include: { amounts: { orderBy: { effectiveFrom: "asc" } } },
   });
 
   let recurringTotal = 0;
@@ -67,8 +69,10 @@ export async function buildYearEndForecast(anchor: Date): Promise<YearEndForecas
   for (const expense of recurring) {
     if (!expense.frequency) continue;
     const occurrences = generateOccurrences(expense.date, expense.frequency, asOf, yearEnd);
-    recurringTotal += occurrences.length * expense.amount;
     recurringCount += occurrences.length;
+    for (const date of occurrences) {
+      recurringTotal += resolveAmount(expense.amounts, date);
+    }
   }
 
   // Estimated variable spending from one-time history (dates before `asOf`).

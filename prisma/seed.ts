@@ -26,6 +26,7 @@ function daysAgo(n: number): Date {
 }
 
 async function main() {
+  await prisma.recurringAmount.deleteMany();
   await prisma.expense.deleteMany();
 
   const expenses = [
@@ -49,7 +50,26 @@ async function main() {
   ];
 
   for (const expense of expenses) {
-    await prisma.expense.create({ data: expense });
+    const data = {
+      title: expense.title,
+      amount: expense.amount,
+      category: expense.category,
+      date: expense.date,
+      frequency: expense.frequency,
+    };
+
+    if (expense.frequency) {
+      await prisma.expense.create({
+        data: {
+          ...data,
+          amounts: {
+            create: { amount: expense.amount, effectiveFrom: expense.date },
+          },
+        },
+      });
+    } else {
+      await prisma.expense.create({ data });
+    }
   }
 
   console.log(`Seeded ${expenses.length} expenses.`);

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { buildReport, getExpenseCategories } from "@/lib/reports";
 import { isPeriod, parseISODate, type Period } from "@/lib/dates";
 import { formatCurrency } from "@/lib/utils";
+import { requireUser } from "@/lib/auth";
 import PrintToolbar from "@/components/print/PrintToolbar";
 
 export const metadata: Metadata = {
@@ -74,6 +75,7 @@ interface PrintPageProps {
 }
 
 export default async function PrintPage({ searchParams }: PrintPageProps) {
+  await requireUser();
   const params = await searchParams;
   const period: Period = isPeriod(params.period) ? params.period : "weekly";
   const anchor = parseISODate(params.date);

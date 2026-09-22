@@ -1,9 +1,12 @@
 import { Suspense } from "react";
+import Link from "next/link";
+import { PlusIcon } from "@/components/icons";
 import { buildReport, getExpenseCategories, getCategoryTotals, getRecurringCharges } from "@/lib/reports";
 import { buildYearEndForecast } from "@/lib/forecast";
 import { buildUpcomingBilling } from "@/lib/billing";
 import { getMonthlyBudget, getMonthlySpending } from "@/lib/budget";
 import { isPeriod, parseISODate, toMonthKey, type Period } from "@/lib/dates";
+import { requireUser } from "@/lib/auth";
 import PeriodSelector from "@/components/dashboard/PeriodSelector";
 import SummaryCards from "@/components/dashboard/SummaryCards";
 import MonthlyBudget from "@/components/dashboard/MonthlyBudget";
@@ -21,6 +24,7 @@ interface DashboardPageProps {
 }
 
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
+  await requireUser();
   const params = await searchParams;
   const period: Period = isPeriod(params.period) ? params.period : "weekly";
   const anchor = parseISODate(params.date);
@@ -68,6 +72,10 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Dashboard</h1>
           <p className="mt-1 text-sm text-slate-500">{report.label}</p>
         </div>
+        <Link href="/expenses/new" className="btn-primary">
+          <PlusIcon />
+          Add expense
+        </Link>
       </div>
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">

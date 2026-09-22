@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import AppChrome from "@/components/AppChrome";
+import { getCurrentUser } from "@/lib/auth";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -18,14 +19,24 @@ export const metadata: Metadata = {
   description: "Track and understand your personal expenses.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  const user = await getCurrentUser();
+
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col" suppressHydrationWarning>
-        <AppChrome>{children}</AppChrome>
+        <AppChrome
+          user={
+            user
+              ? { name: user.name, email: user.email, image: user.image }
+              : null
+          }
+        >
+          {children}
+        </AppChrome>
       </body>
     </html>
   );
