@@ -101,16 +101,26 @@
   transition: fill 0.15s ease;
 }
 
-.chart-bar:hover {
-  fill: #4f46e5;
-}
-
 .chart-bar-estimated {
   transition: fill 0.15s ease;
 }
 
-.chart-bar-estimated:hover {
+.chart-column {
+  cursor: pointer;
+}
+
+.chart-column:hover .chart-bar {
+  fill: #4f46e5;
+}
+
+.chart-column:hover .chart-bar-estimated {
   fill: #c7d2fe;
+}
+
+.chart-bar-hitarea:focus-visible {
+  fill: rgba(99, 102, 241, 0.08);
+  stroke: #6366f1;
+  stroke-width: 1.5;
 }
 
 .chart-legend-hatch {
