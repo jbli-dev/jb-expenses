@@ -89,6 +89,30 @@ function bucketDate(period: Period, key: string, start: Date): Date {
   return startOfDay(new Date(start.getFullYear(), index, 1));
 }
 
+interface BucketBreakdown {
+  recurring: number;
+  oneTime: number;
+  recurringActual: number;
+  recurringEstimated: number;
+  oneTimeActual: number;
+  oneTimeEstimated: number;
+}
+
+function emptyBreakdown(): BucketBreakdown {
+  return {
+    recurring: 0,
+    oneTime: 0,
+    recurringActual: 0,
+    recurringEstimated: 0,
+    oneTimeActual: 0,
+    oneTimeEstimated: 0,
+  };
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 export default function SpendingChart({
   report,
   categories,
@@ -100,24 +124,57 @@ export default function SpendingChart({
 }) {
   const { buckets } = report;
   const [activeBucket, setActiveBucket] = useState<(typeof buckets)[number] | null>(null);
+  const today = startOfDay(new Date()).getTime();
+  const periodStart = startOfDay(new Date(report.start));
 
-  const itemsByBucket = useMemo(() => {
+  const { itemsByBucket, breakdownByBucket } = useMemo(() => {
     const map = new Map<string, ReportOccurrence[]>();
-    const start = startOfDay(new Date(report.start));
+    const breakdown = new Map<string, BucketBreakdown>();
     for (const occurrence of report.occurrences) {
-      const key = bucketKeyForOccurrence(report.period, new Date(occurrence.date), start);
+      const occurrenceDate = new Date(occurrence.date);
+      const key = bucketKeyForOccurrence(report.period, occurrenceDate, periodStart);
       const list = map.get(key);
       if (list) {
         list.push(occurrence);
       } else {
         map.set(key, [occurrence]);
       }
+
+      const bucketBreakdown = breakdown.get(key) ?? emptyBreakdown();
+      const isRecurring = occurrence.frequency !== null;
+      const isEstimated = occurrenceDate.getTime() > today;
+
+      if (isRecurring) {
+        bucketBreakdown.recurring = round2(bucketBreakdown.recurring + occurrence.amount);
+        if (isEstimated) {
+          bucketBreakdown.recurringEstimated = round2(
+            bucketBreakdown.recurringEstimated + occurrence.amount,
+          );
+        } else {
+          bucketBreakdown.recurringActual = round2(
+            bucketBreakdown.recurringActual + occurrence.amount,
+          );
+        }
+      } else {
+        bucketBreakdown.oneTime = round2(bucketBreakdown.oneTime + occurrence.amount);
+        if (isEstimated) {
+          bucketBreakdown.oneTimeEstimated = round2(
+            bucketBreakdown.oneTimeEstimated + occurrence.amount,
+          );
+        } else {
+          bucketBreakdown.oneTimeActual = round2(
+            bucketBreakdown.oneTimeActual + occurrence.amount,
+          );
+        }
+      }
+
+      breakdown.set(key, bucketBreakdown);
     }
     for (const list of map.values()) {
       list.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     }
-    return map;
-  }, [report]);
+    return { itemsByBucket: map, breakdownByBucket: breakdown };
+  }, [periodStart, report, today]);
 
   useEffect(() => {
     if (!activeBucket) return;
@@ -148,8 +205,9 @@ export default function SpendingChart({
   const labelStep = 1;
 
   const activeItems = activeBucket ? (itemsByBucket.get(activeBucket.key) ?? []) : [];
-  const today = startOfDay(new Date()).getTime();
-  const periodStart = startOfDay(new Date(report.start));
+  const activeBreakdown = activeBucket
+    ? (breakdownByBucket.get(activeBucket.key) ?? emptyBreakdown())
+    : emptyBreakdown();
 
   return (
     <>
@@ -178,12 +236,16 @@ export default function SpendingChart({
         aria-label={`Spending chart for ${report.label}`}
       >
         <defs>
-          <linearGradient id="bar-gradient" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id="bar-gradient-recurring" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#6366f1" />
             <stop offset="100%" stopColor="#4f46e5" />
           </linearGradient>
+          <linearGradient id="bar-gradient-one-time" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#fb923c" />
+            <stop offset="100%" stopColor="#ea580c" />
+          </linearGradient>
           <pattern
-            id="bar-hatch"
+            id="bar-hatch-recurring"
             width="7"
             height="7"
             patternUnits="userSpaceOnUse"
@@ -192,16 +254,23 @@ export default function SpendingChart({
             <rect width="7" height="7" fill="#e0e7ff" />
             <line x1="0" y1="0" x2="0" y2="7" stroke="#818cf8" strokeWidth="2" />
           </pattern>
+          <pattern
+            id="bar-hatch-one-time"
+            width="7"
+            height="7"
+            patternUnits="userSpaceOnUse"
+            patternTransform="rotate(45)"
+          >
+            <rect width="7" height="7" fill="#ffedd5" />
+            <line x1="0" y1="0" x2="0" y2="7" stroke="#f97316" strokeWidth="2" />
+          </pattern>
         </defs>
 
         {buckets.map((bucket, i) => {
           const x = PAD_X + i * slot + (slot - barWidth) / 2;
           const height = bucket.total === 0 ? 0 : Math.max((bucket.total / max) * chartHeight, 2);
           const y = PAD_TOP + (chartHeight - height);
-          const ratio =
-            bucket.total === 0 ? 0 : Math.min(1, Math.max(0, bucket.actual / bucket.total));
-          const actualHeight = height * ratio;
-          const estimatedHeight = height - actualHeight;
+          const breakdown = breakdownByBucket.get(bucket.key) ?? emptyBreakdown();
           const showLabel = i % labelStep === 0;
           const isPastOrToday = bucketDate(report.period, bucket.key, periodStart).getTime() <= today;
           const bucketDay = bucketDate(report.period, bucket.key, periodStart);
@@ -211,7 +280,30 @@ export default function SpendingChart({
             5,
             Math.min(7, (slot - 16) / Math.max(1, valueText.length) / 0.65),
           );
-          const tooltip = `${bucket.label} · total ${formatCurrency(bucket.total)} · actual ${formatCurrency(bucket.actual)} · estimated ${formatCurrency(bucket.estimated)} · click for details`;
+          const tooltip = `${bucket.label} · total ${formatCurrency(bucket.total)} · recurring ${formatCurrency(breakdown.recurring)} · one-time ${formatCurrency(breakdown.oneTime)} · actual ${formatCurrency(bucket.actual)} · estimated ${formatCurrency(bucket.estimated)} · click for details`;
+          const segments = [
+            {
+              value: breakdown.recurringActual,
+              fill: "url(#bar-gradient-recurring)",
+              className: "chart-segment chart-segment-recurring",
+            },
+            {
+              value: breakdown.recurringEstimated,
+              fill: "url(#bar-hatch-recurring)",
+              className: "chart-segment chart-segment-recurring-estimated",
+            },
+            {
+              value: breakdown.oneTimeActual,
+              fill: "url(#bar-gradient-one-time)",
+              className: "chart-segment chart-segment-one-time",
+            },
+            {
+              value: breakdown.oneTimeEstimated,
+              fill: "url(#bar-hatch-one-time)",
+              className: "chart-segment chart-segment-one-time-estimated",
+            },
+          ].filter((segment) => segment.value > 0);
+          let currentY = y + height;
 
           return (
             <g key={bucket.key} className="chart-column" onClick={() => setActiveBucket(bucket)}>
@@ -228,26 +320,26 @@ export default function SpendingChart({
               />
               {height > 0 && (
                 <g clipPath={`url(#bar-clip-${bucket.key})`}>
-                  {estimatedHeight > 0 && (
-                    <rect
-                      className="chart-bar-estimated"
-                      x={x}
-                      y={y}
-                      width={barWidth}
-                      height={estimatedHeight}
-                      fill="url(#bar-hatch)"
-                    />
-                  )}
-                  {actualHeight > 0 && (
-                    <rect
-                      className="chart-bar"
-                      x={x}
-                      y={y + estimatedHeight}
-                      width={barWidth}
-                      height={actualHeight}
-                      fill="url(#bar-gradient)"
-                    />
-                  )}
+                  {segments.map((segment, index) => {
+                    if (bucket.total <= 0) return null;
+                    const segmentHeight =
+                      index === segments.length - 1
+                        ? currentY - y
+                        : (segment.value / bucket.total) * height;
+                    if (segmentHeight <= 0) return null;
+                    currentY -= segmentHeight;
+                    return (
+                      <rect
+                        key={`${bucket.key}-${segment.className}`}
+                        className={segment.className}
+                        x={x}
+                        y={currentY}
+                        width={barWidth}
+                        height={segmentHeight}
+                        fill={segment.fill}
+                      />
+                    );
+                  })}
                 </g>
               )}
               {showValues && height > 0 && (
@@ -304,14 +396,26 @@ export default function SpendingChart({
         })}
       </svg>
 
-      <div className="mt-3 flex items-center justify-end gap-4 text-xs text-slate-500">
+      <div className="mt-3 flex flex-wrap items-center justify-end gap-4 text-xs text-slate-500">
         <span className="inline-flex items-center gap-1.5">
-          <span className="h-3 w-3 rounded-[3px] bg-gradient-to-b from-indigo-500 to-indigo-600" aria-hidden="true" />
-          Actual
+          <span
+            className="h-3 w-3 rounded-[3px]"
+            aria-hidden="true"
+            style={{ background: "linear-gradient(to bottom, #6366f1, #4f46e5)" }}
+          />
+          Recurring
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span
+            className="h-3 w-3 rounded-[3px]"
+            aria-hidden="true"
+            style={{ background: "linear-gradient(to bottom, #fb923c, #ea580c)" }}
+          />
+          One-time
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="chart-legend-hatch h-3 w-3 rounded-[3px]" aria-hidden="true" />
-          Estimated
+          Striped = upcoming
         </span>
       </div>
         </>
@@ -339,7 +443,7 @@ export default function SpendingChart({
               <p className="mt-0.5 text-xs text-slate-500">
                 {activeItems.length === 0
                   ? "No spending recorded for this date."
-                  : `${activeItems.length} ${activeItems.length === 1 ? "item" : "items"} · actual ${formatCurrency(activeBucket.actual)} · estimated ${formatCurrency(activeBucket.estimated)}`}
+                : `${activeItems.length} ${activeItems.length === 1 ? "item" : "items"} · recurring ${formatCurrency(activeBreakdown.recurring)} · one-time ${formatCurrency(activeBreakdown.oneTime)} · actual ${formatCurrency(activeBucket.actual)} · estimated ${formatCurrency(activeBucket.estimated)}`}
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-3">
