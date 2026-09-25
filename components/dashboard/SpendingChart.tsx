@@ -272,7 +272,6 @@ export default function SpendingChart({
           const y = PAD_TOP + (chartHeight - height);
           const breakdown = breakdownByBucket.get(bucket.key) ?? emptyBreakdown();
           const showLabel = i % labelStep === 0;
-          const isPastOrToday = bucketDate(report.period, bucket.key, periodStart).getTime() <= today;
           const bucketDay = bucketDate(report.period, bucket.key, periodStart);
           const valueText = formatCurrency(bucket.total);
           // Shrink the label when needed so the exact amount keeps clear of its slot edges.
@@ -359,7 +358,8 @@ export default function SpendingChart({
                   x={x + barWidth / 2}
                   y={CHART_HEIGHT - 10}
                   textAnchor="middle"
-                  fontWeight={isPastOrToday ? 700 : undefined}
+                  fontWeight={bucketDay.getTime() === today ? 700 : undefined}
+                  fill={bucketDay.getTime() === today ? "#0f172a" : undefined}
                 >
                   {report.period === "weekly" ? (
                     <>
